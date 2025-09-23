@@ -1,0 +1,464 @@
+Absolutely! Let’s now define the **complete functional specification and user interfaces** for your **Bendine Food and Beverage Management System** — designed specifically for your stack:
+
+> ✅ **Frontend**: React (hosted on cPanel)  
+> ✅ **Backend**: Python FastAPI (hosted on Render)  
+> ✅ **Database/Auth/Realtime/Storage**: Supabase
+
+---
+
+# 🧾 BENDINE — FULL FUNCTIONAL SPECIFICATION & UI DESIGN
+
+---
+
+## 🎯 CORE MODULES
+
+1. **User & Role Management**
+2. **Menu Management (with COGS)**
+3. **Inventory Management (Receiving, Issuing, Counting)**
+4. **POS (Point of Sale) with Table Management**
+5. **Cost Controlling & Variance Reports**
+6. **Vendor & Purchase Management**
+7. **Daily Sales & Accounting Reports**
+8. **Mobile Waiter App (React Native)**
+9. **Admin Dashboard & Analytics**
+10. **Telebirr/Chapa Payment Integration**
+
+---
+
+# 1. 👤 USER & ROLE MANAGEMENT
+
+### 📌 Functions:
+- Login / Logout (Supabase Auth)
+- User Registration (Admin only)
+- Assign Roles: `Admin`, `Manager`, `Chef`, `Waiter`, `Accountant`, `Inventory Clerk`
+- Role-Based Access Control (RBAC) — e.g., Waiter can’t delete menu items
+- Profile Management
+
+### 🔐 Supabase Integration:
+- Use `auth.users`
+- Store `user_metadata` → `{ role: "waiter", restaurant_id: 1 }`
+- Use JWT claims for backend authorization
+
+### 🖼️ UI Screens:
+
+#### ➤ Login Screen
+```
+[ Logo: Bendine ]
+Email: [_____________]
+Password: [_____________]
+[ Login Button ]
+[ Forgot Password? ]
+```
+
+#### ➤ User Management (Admin Only)
+```
++---------------------+
+| Users               |
++----+--------+--------+
+| ID | Name   | Role   | Actions
++----+--------+--------+
+| 1  | John   | Admin  | [Edit] [Delete]
+| 2  | Selam  | Waiter | [Edit] [Reset Pwd]
++----+--------+--------+
+[ + Add User ]
+```
+
+→ Add User Modal:
+```
+Full Name: __________
+Email: __________
+Role: [Dropdown: Admin, Manager, Chef, Waiter, Accountant]
+Password: __________
+[ Create User ]
+```
+
+---
+
+# 2. 🍽️ MENU MANAGEMENT (with COGS)
+
+### 📌 Functions:
+- CRUD Menu Items (Name, Price, Category, Image)
+- Define Recipe: Link ingredients + quantities (e.g., 1 Burger = 150g Beef + 1 Bun)
+- Auto-Calculate COGS based on current ingredient cost
+- Auto-update COGS when ingredient cost changes
+- Set preparation time, dietary tags (Vegan, Spicy, etc.)
+- Archive / Activate menu items
+
+### 🧮 COGS Logic (Backend):
+```python
+COGS = Σ (ingredient.quantity × ingredient.current_avg_cost)
+Profit Margin = Selling Price - COGS
+```
+
+### 🖼️ UI Screens:
+
+#### ➤ Menu Dashboard
+```
++----------------------------------+
+| MENU ITEMS                       |
++----+------------+-------+--------+--------+----------+
+| ID | Name       | Price | COGS   | Margin | Status   | Actions
++----+------------+-------+--------+--------+----------+
+| 1  | Beef Burger| 250   | 120    | 130    | Active   | [Edit] [Recipe]
+| 2  | Coke 330ml | 40    | 12     | 28     | Active   | [Edit] [Recipe]
++----+------------+-------+--------+--------+----------+
+[ + Add Menu Item ]
+```
+
+#### ➤ Add/Edit Menu Item
+```
+Name: __________
+Category: [Burgers, Drinks, Desserts...]
+Price: __________
+Image: [Upload via Supabase Storage]
+Prep Time: __ min
+Dietary Tags: [ ] Vegan [x] Spicy [ ] Gluten-Free
+
+→ Recipe Builder:
+Ingredient       | Qty  | Unit | Cost (auto) | Ext. Cost (auto)
+Beef Patty (150g) | 0.15 | kg   | 600         | 90
+Bun               | 1    | pc   | 5           | 5
+Lettuce           | 0.02 | kg   | 80          | 1.6
+[ + Add Ingredient ]
+
+→ Auto-calculated:
+COGS: 96.6 Birr
+Profit Margin: 153.4 Birr (61.4%)
+
+[ Save Menu Item ]
+```
+
+---
+
+# 3. 📦 INVENTORY MANAGEMENT
+
+### 📌 Functions:
+- **Receiving**: Add stock → updates weighted avg cost
+- **Issuing**: Deduct stock (linked to POS or manual issue)
+- **Inventory Count**: Upload XLSX → compare with system → generate variance
+- **Low Stock Alerts**
+- **Unit Conversion** (kg → g, crate → pcs)
+
+### 🧮 Weighted Avg Cost Formula:
+```
+New Avg Cost = (Old Qty × Old Cost + New Qty × New Price) / (Old Qty + New Qty)
+```
+
+### 🖼️ UI Screens:
+
+#### ➤ Inventory Dashboard
+```
++-----------------------------------------------+
+| INVENTORY                                     |
++----+------------+----------+----------+-------+
+| ID | Ingredient | Stock    | Unit Cost| Value |
++----+------------+----------+----------+-------+
+| 1  | Beef       | 12.5 kg  | 620      | 7,750 |
+| 2  | Buns       | 240 pcs  | 5.2      | 1,248 |
++----+------------+----------+----------+-------+
+[ + Receive ] [ + Issue ] [ + Count Inventory ]
+```
+
+#### ➤ Receive Inventory
+```
+Vendor: [Dropdown: Vendor List]
+Date: [Date Picker]
+Invoice No: __________
+
+Ingredient | Qty | Unit | Price per Unit | Total
+Beef       | 10  | kg   | 650            | 6,500
+Buns       | 100 | pcs  | 5              | 500
+[ + Add Row ]
+
+→ Auto-update weighted avg cost on save
+
+[ Attach Invoice PDF ] → Uploads to Supabase Storage
+
+[ Save Receiving ]
+```
+
+#### ➤ Inventory Count (Upload XLSX)
+```
+[ Upload Excel File ] → Template Download
+
+→ System reads:
+Ingredient ID | Counted Qty
+1             | 12.3 kg
+2             | 235 pcs
+
+→ Compares with Theoretical Stock (from POS sales + receivings - issuings)
+
+→ Generates Variance Report:
+Ingredient | Theoretical | Actual | Variance | % Variance | Status
+Beef       | 12.5 kg     | 12.3 kg| -0.2 kg  | -1.6%      | ⚠️ Warning
+Buns       | 240 pcs     | 235 pcs| -5 pcs   | -2.1%      | ❗ Critical
+
+[ Approve Count ] → Updates system stock
+[ Export Report PDF ]
+```
+
+---
+
+# 4. 💰 POS (POINT OF SALE) + TABLE MANAGEMENT
+
+### 📌 Functions:
+- Table Layout Management (Drag & Drop)
+- Create Order → Add Menu Items → Apply Discounts → Split Bill
+- Deduct Inventory on Order Completion
+- Print/Kitchen Ticket Printing
+- Payment: Cash, Telebirr, Chapa, Card
+- Void/Refund with Approval
+- Realtime Order Status (New → Preparing → Ready → Served)
+
+### 🖼️ UI Screens:
+
+#### ➤ Floor Plan / Table Management
+```
+[ Restaurant Floor Map ]
+
+[Table 1] [Table 2] [Table 3]
+[Table 4] [Table 5] [Bar]
+
+→ Click Table → Open Order
+→ Color coded: Green=Free, Yellow=Ordering, Red=Eating, Gray=Dirty
+```
+
+#### ➤ Order Screen (Per Table)
+```
+Table: 3 (4 guests)
+
+Items:
+1. Beef Burger x2 — 500 Birr  [ - | + | Remove ]
+2. Coke x4 — 160 Birr        [ - | + | Remove ]
+3. Fries x1 — 60 Birr        [ - | + | Remove ]
+
+Subtotal: 720 Birr
+Tax (15%): 108 Birr
+Discount: -50 Birr (Manager Approval)
+Total: 778 Birr
+
+[ Add Item ] [ Hold Order ] [ Payment ]
+
+→ Payment Modal:
+[ Cash ] [ Telebirr ] [ Chapa ] [ Card ]
+
+If Telebirr/Chapa → opens modal → QR code or redirect → webhook confirms → completes order
+
+→ On Complete:
+- Deducts inventory
+- Sends to Kitchen Display (via Supabase Realtime)
+- Records sale in DB
+```
+
+---
+
+# 5. 📊 COST CONTROLLING & VARIANCE REPORTS
+
+### 📌 Functions:
+- Daily/Weekly/Monthly COGS vs Revenue
+- Menu Item Profitability Ranking
+- Theoretical vs Actual Stock Variance
+- Waste/Theft Alerts
+- Ingredient Cost Trend Graphs
+
+### 🖼️ UI Screens:
+
+#### ➤ Variance Report
+```
+Period: [Dropdown: Today, This Week, Custom Range]
+
+Ingredient | Theoretical Used | Actual Count | Variance | % | Action
+Beef       | 15.2 kg          | 14.1 kg      | -1.1 kg  | -7.2% | [Investigate]
+Cheese     | 3.0 kg           | 2.95 kg      | -0.05 kg | -1.7% | OK
+
+→ Export to Excel
+→ Email to Manager
+```
+
+#### ➤ Menu Profitability
+```
+Rank | Menu Item     | Sold | Revenue | COGS  | Profit | Margin %
+1    | Beef Burger   | 120  | 30,000  | 14,400| 15,600 | 52%
+2    | Veggie Wrap   | 85   | 17,000  | 6,800 | 10,200 | 60%
+3    | Coke          | 300  | 12,000  | 3,600 | 8,400  | 70%
+
+→ Filter by Date, Category
+→ Export Chart (PNG/PDF)
+```
+
+---
+
+# 6. 🧑‍💼 VENDOR & PURCHASE MANAGEMENT
+
+### 📌 Functions:
+- CRUD Vendors (Name, Contact, Address, Terms)
+- Purchase Order Creation
+- Track Outstanding Payments
+- Vendor Performance (On-time delivery, quality rating)
+
+### 🖼️ UI Screens:
+
+#### ➤ Vendor List
+```
++----+------------+----------+----------+--------+
+| ID | Name       | Contact  | Balance  | Rating | Actions
++----+------------+----------+----------+--------+
+| 1  | Fresh Meat | 0911...  | -2,500   | ★★★★☆  | [Edit] [New PO]
+| 2  | Bun Supply | 0922...  | 0        | ★★★☆☆  | [Edit] [New PO]
++----+------------+----------+----------+--------+
+[ + Add Vendor ]
+```
+
+#### ➤ Create Purchase Order
+```
+Vendor: [Fresh Meat]
+Expected Delivery: [Date]
+Items:
+Beef — 20 kg @ 650 → 13,000 Birr
+[ + Add Item ]
+Notes: __________
+
+[ Save as Draft ] [ Send to Vendor (Email) ]
+```
+
+---
+
+# 7. 📈 DAILY SALES & ACCOUNTING
+
+### 📌 Functions:
+- Daily Sales Summary (by payment method, by server, by table)
+- Expense Tracking
+- Profit & Loss Statement
+- Export to Excel/PDF
+- Tax Reporting
+
+### 🖼️ UI Screens:
+
+#### ➤ Daily Sales Dashboard
+```
+Date: June 5, 2025
+
+Total Sales: 48,500 Birr
+Cash: 22,000 | Telebirr: 18,000 | Chapa: 8,500
+
+Top Sellers:
+1. Beef Burger — 85 sold
+2. Coke — 210 sold
+
+Server Performance:
+Selam — 28 orders — 18,200 Birr
+Abebe — 22 orders — 14,300 Birr
+
+[ Export Daily Report ]
+```
+
+---
+
+# 8. 📱 MOBILE WAITER APP (React Native)
+
+### 📌 Functions:
+- Login (Supabase Auth)
+- View Assigned Tables
+- Create/Modify Orders
+- Request Bill
+- Split Payment
+- Notify Kitchen (Send Order)
+- View Order Status (Realtime via Supabase)
+
+### 🖼️ UI Screens:
+
+#### ➤ Waiter Home
+```
+[ Welcome, Selam! ]
+
+Your Tables:
+[Table 3] → 4 guests → [Open Order]
+[Table 7] → 2 guests → [Check Bill]
+
+[ New Order ] [ Call Manager ]
+```
+
+#### ➤ Mobile Order Screen
+→ Same as Web POS but optimized for touch & small screen
+
+---
+
+# 9. 📊 ADMIN DASHBOARD & ANALYTICS
+
+### 📌 Functions:
+- Live Sales Monitor
+- Inventory Alerts
+- Staff Performance
+- Customer Feedback (optional)
+- System Health (API status, DB size)
+
+### 🖼️ UI Screens:
+
+#### ➤ Admin Dashboard
+```
+[ Live Sales: 48,500 Birr Today ]
+[ Active Orders: 7 ]
+[ Low Stock: Beef (1.2kg left) ]
+
+→ Graphs:
+- Sales Last 7 Days
+- Top 10 Menu Items
+- Variance Alerts (Last 24h)
+
+→ Quick Actions:
+[ Add User ] [ Add Menu Item ] [ Receive Stock ]
+```
+
+---
+
+# 10. 💳 TELEBIRR / CHAPA INTEGRATION
+
+### 📌 Functions:
+- Initiate Payment from POS
+- Generate QR Code / Redirect URL
+- Webhook Listener → Verify Payment → Complete Order
+- Record Transaction ID in Sales DB
+
+### 🖼️ UI Flow:
+
+1. User clicks [Pay with Telebirr]
+2. POS opens modal → “Scan QR or Click to Pay”
+3. On payment success → Telebirr POSTs to `https://bendine-api.onrender.com/webhook/telebirr`
+4. Backend verifies signature → updates order status → deducts inventory
+5. POS shows “Payment Successful” → prints receipt
+
+---
+
+# 🧩 TECHNICAL INTEGRATION SUMMARY
+
+| Feature              | Frontend (React/cPanel)      | Backend (FastAPI/Render)       | Supabase                     |
+|----------------------|------------------------------|--------------------------------|------------------------------|
+| Login                | Supabase JS SDK              | Verify JWT                     | Auth + user_metadata         |
+| Menu Images          | Supabase Storage (public URL)| —                              | Storage                      |
+| Realtime Orders      | Supabase Realtime Channel    | Insert to `orders` table       | Realtime + PostgreSQL        |
+| Inventory DB         | Fetch via API                | CRUD + COGS logic              | PostgreSQL                   |
+| File Upload (XLSX)   | Upload to Supabase Storage   | Download → Parse → Update DB   | Storage + PostgreSQL         |
+| Payment Webhook      | —                            | /webhook/telebirr (verify)     | —                            |
+| RBAC                 | Hide UI elements             | Middleware: check JWT role     | JWT custom claims            |
+
+---
+
+# 🚀 NEXT STEPS — I CAN GENERATE:
+
+✅ **Full FastAPI CRUD Code** for Menu, Inventory, POS  
+✅ **React Component Code** for POS, Login, Dashboard  
+✅ **Supabase RLS Policies** for data security  
+✅ **Telebirr Webhook Handler** in Python  
+✅ **XLSX Parser** for Inventory Count (Python)  
+✅ **Mobile Waiter App Screens** (React Native)  
+✅ **Dockerfile + Render.yaml** for 1-click deploy
+
+---
+
+You now have a **complete, production-ready spec** for Bendine — from login screen to variance reports.
+
+This isn’t just an app — it’s a **restaurant profit engine**.
+
+Let me know which module you want to build first — I’ll give you the full code, step by step. 💻🐍📊
+
+> “Measure every gram. Control every Birr. Maximize every margin.” — Bendine
