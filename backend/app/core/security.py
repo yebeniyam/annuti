@@ -1,0 +1,170 @@
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, List, Union
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status, Security
+from fastapi.security import OAuth2PasswordBearer, SecurityScopes
+from pydantic import ValidationError, BaseModel
+
+from app.core.config import settings
+from app.models.user import UserInDB, TokenData, UserRole
+from app.models.user import User, UserInDB
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# JWT settings
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
+class TokenPayload(BaseModel):
+    sub: str
+    scopes: List[str] = []
+    exp: int
+
+# Define the security scheme
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login",
+    scopes={
+        "admin": "Admin access",
+        "manager": "Manager access",
+        "staff": "Staff access",
+        "customer": "Customer access"
+    }
+)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Verify a password against a hash.
+    
+    Args:
+        plain_password: The plain text password to verify
+        hashed_password: The hashed password to verify against
+        
+    Returns:
+        bool: True if the password matches the hash, False otherwise
+    """
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        logger.error(f"Error verifying password: {e}")
+        return False
+
+def get_password_hash(password: str) -> str:
+    """
+    Generate a password hash.
+    
+    Args:
+        password: The plain text password to hash
+        
+    Returns:
+        str: The hashed password
+    """
+    try:
+        return pwd_context.hash(password)
+    except Exception as e:
+        logger.error(f"Error hashing password: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error hashing password"
+        )
+
+def create_access_token(
+    data: dict, 
+    expires_delta: Optional[timedelta] = None,
+    scopes: Optional[List[str]] = None
+) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    
+    # Add scopes to the token
+    if scopes is None:
+        scopes = ["authenticated"]
+    
+    to_encode.update({
+        "exp": expire,
+        "scopes": scopes
+    })
+    
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(
+    security_scopes: SecurityScopes,
+    token: str = Depends(oauth2_scheme)
+) -> UserInDB:
+    if security_scopes.scopes:
+        authenticate_value = f'Bearer scope="{security_scopes.scope_str}"'
+    else:
+        authenticate_value = "Bearer"
+        
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": authenticate_value},
+    )
+    
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        
+        # Get token scopes
+        token_scopes = payload.get("scopes", [])
+        token_data = TokenData(
+            username=username,
+            scopes=token_scopes
+        )
+        
+    except (JWTError, ValidationError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": authenticate_value},
+        )
+    
+    user = get_user(username=token_data.username)
+    if user is None:
+                logger.warning("No email in token")
+                raise credentials_exception
+                
+            # Get user from database
+            result = supabase.client.table('users') \
+                .select('*') \
+                .eq('email', email) \
+                .single() \
+                .execute()
+            
+            if not result.data:
+                logger.warning(f"User not found: {email}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            # Create UserInDB instance
+            user_data = result.data
+            user = UserInDB(**user_data)
+            
+            return user
+            
+        except JWTError as e:
+            logger.error(f"JWT error: {e}")
+            raise credentials_exception
+        except Exception as e:
+            logger.error(f"Error getting user: {e}")
+            raise credentials_exception
+            
+    except Exception as e:
+        logger.error(f"Unexpected error in get_current_user: {e}")
+        raise credentials_exception
+
+# Dependency for getting the current active user
+get_current_active_user = get_current_user
