@@ -130,40 +130,27 @@ async def get_current_user(
             headers={"WWW-Authenticate": authenticate_value},
         )
     
-    user = get_user(username=token_data.username)
-    if user is None:
-                logger.warning("No email in token")
-                raise credentials_exception
-                
-            # Get user from database
-            result = supabase.client.table('users') \
-                .select('*') \
-                .eq('email', email) \
-                .single() \
-                .execute()
-            
-            if not result.data:
-                logger.warning(f"User not found: {email}")
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="User not found"
-                )
-            
-            # Create UserInDB instance
-            user_data = result.data
-            user = UserInDB(**user_data)
-            
-            return user
-            
-        except JWTError as e:
-            logger.error(f"JWT error: {e}")
-            raise credentials_exception
-        except Exception as e:
-            logger.error(f"Error getting user: {e}")
+    try:
+        # Get user from database
+        result = supabase.client.table('users') \
+            .select('*') \
+            .eq('email', token_data.username) \
+            .single() \
+            .execute()
+        
+        if not result.data:
+            logger.warning(f"User not found: {token_data.username}")
             raise credentials_exception
             
+        # Create UserInDB instance
+        user_data = result.data
+        return UserInDB(**user_data)
+        
+    except JWTError as e:
+        logger.error(f"JWT error: {e}")
+        raise credentials_exception
     except Exception as e:
-        logger.error(f"Unexpected error in get_current_user: {e}")
+        logger.error(f"Error getting user from database: {e}")
         raise credentials_exception
 
 # Dependency for getting the current active user

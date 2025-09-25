@@ -2,6 +2,9 @@
 
 Bendine is a comprehensive restaurant management system that streamlines operations from menu management to point of sale, inventory, and reporting.
 
+db-password supabase
+aCC8dZ?T4Nu/aen
+
 ## Deployment Instructions
 
 ### Backend (Render)
@@ -33,9 +36,9 @@ The mobile app can be built for iOS and Android using React Native CLI or Expo.
 
 ### Backend (.env)
 ```
-DATABASE_URL=your_database_url
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
+DATABASE_URL=postgresql://postgres:Anna-160214@db.iofghnbhzoqjyhelfxfx.supabase.co:5432/postgres
+SUPABASE_URL=https://iofghnbhzoqjyhelfxfx.supabase.co
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvZmdobmJoem9xanloZWxmeGZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4MzcyNDMsImV4cCI6MjA3NDQxMzI0M30.uPHTTxq5WfQhWIxhu25sqKE9MIzcFPu1alj102FLtX0
 SECRET_KEY=your_secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
