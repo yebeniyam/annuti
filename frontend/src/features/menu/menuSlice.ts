@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
-import { MenuItem, MenuCategory } from '../types/menu';
+import { MenuItem, MenuCategory } from '../../types/menu';
 
 interface MenuState {
   categories: MenuCategory[];

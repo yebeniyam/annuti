@@ -22,18 +22,15 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  CircularProgress,
   Alert,
 } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
-import { MenuItem, MenuCategory } from '../types/menu';
-import { fetchMenuItems, addMenuItem, updateMenuItem, deleteMenuItem, fetchCategories } from '../features/menu/menuSlice';
+import { MenuItem as MenuItemType } from '../types/menu';
 import { 
   fetchMenuItems, 
   addMenuItem, 
-  updateMenuItem, 
-  deleteMenuItem,
+  updateMenuItem,
   fetchCategories
 } from '../features/menu/menuSlice';
 
@@ -41,7 +38,7 @@ const MenuManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
-  const [currentItem, setCurrentItem] = useState<MenuItem | null>(null);
+  const [currentItem, setCurrentItem] = useState<MenuItemType | null>(null);
   
   // Form state
   const [name, setName] = useState('');
@@ -53,7 +50,7 @@ const MenuManagement: React.FC = () => {
   const [prepTime, setPrepTime] = useState('');
   
   const dispatch = useDispatch<AppDispatch>();
-  const { items, categories, loading, error } = useSelector((state: RootState) => state.menu);
+  const { items, categories, error } = useSelector((state: RootState) => state.menu);
 
   useEffect(() => {
     // Fetch data when component mounts
@@ -65,7 +62,7 @@ const MenuManagement: React.FC = () => {
     setActiveTab(newValue);
   };
 
-  const handleOpenDialog = (mode: 'add' | 'edit', item?: MenuItem) => {
+  const handleOpenDialog = (mode: 'add' | 'edit', item?: MenuItemType) => {
     setDialogMode(mode);
     
     if (mode === 'edit' && item) {
@@ -101,7 +98,20 @@ const MenuManagement: React.FC = () => {
     
     try {
       if (dialogMode === 'add') {
-        await dispatch(addMenuItem({
+        const newItem: Omit<MenuItemType, 'id'> = {
+          name,
+          description: description || '',
+          price: parseFloat(price),
+          cost: parseFloat(cost),
+          category_id: categoryId,
+          category_name: categories.find(cat => cat.id === categoryId)?.name || 'Uncategorized',
+          is_available: isAvailable,
+          prep_time: prepTime ? parseInt(prepTime) : undefined,
+        };
+        
+        await dispatch(addMenuItem(newItem)).unwrap();
+      } else if (currentItem) {
+        const updatedItem: Partial<MenuItemType> = {
           name,
           description: description || '',
           price: parseFloat(price),
@@ -109,19 +119,11 @@ const MenuManagement: React.FC = () => {
           category_id: categoryId,
           is_available: isAvailable,
           prep_time: prepTime ? parseInt(prepTime) : undefined,
-        } as MenuItem)).unwrap();
-      } else if (currentItem) {
+        };
+        
         await dispatch(updateMenuItem({
           id: currentItem.id,
-          itemData: {
-            name,
-            description: description || '',
-            price: parseFloat(price),
-            cost: parseFloat(cost),
-            category_id: categoryId,
-            is_available: isAvailable,
-            prep_time: prepTime ? parseInt(prepTime) : undefined,
-          }
+          itemData: updatedItem
         })).unwrap();
       }
       
@@ -179,7 +181,7 @@ const MenuManagement: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {menuItems.map((item) => (
+                  {items.map((item: MenuItemType) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.id}</TableCell>
                       <TableCell>{item.name}</TableCell>

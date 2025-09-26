@@ -57,16 +57,13 @@ app = FastAPI(
 )
 
 # Configure CORS
-cors_origins = ["*"]  # In production, replace with specific origins
-if settings.CORS_ORIGINS:
-    cors_origins = settings.CORS_ORIGINS
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=settings.ALLOW_CREDENTIALS,
+    allow_methods=settings.ALLOWED_METHODS,
+    allow_headers=settings.ALLOWED_HEADERS,
+    expose_headers=["Content-Disposition"],  # For file downloads
 )
 
 # Exception handlers

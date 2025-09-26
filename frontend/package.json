@@ -67,7 +67,12 @@
     "eslint-plugin-react": "^7.32.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "gh-pages": "^5.0.0",
-    "prettier": "^2.8.4"
+    "html-webpack-plugin": "^5.6.4",
+    "prettier": "^2.8.4",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2",
+    "webpack-manifest-plugin": "^5.0.1"
   },
   "proxy": "http://localhost:8000"
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Container,
   Typography,
@@ -32,11 +32,10 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '../store';
+
 
 // Types for POS system
-interface Table {
+interface TableInfo {
   id: string;
   name: string;
   capacity: number;
@@ -75,18 +74,14 @@ interface OrderItem {
 
 const POS: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
-  const [openOrderDialog, setOpenOrderDialog] = useState(false);
+  const [selectedTable, setSelectedTable] = useState<TableInfo | null>(null);
+  
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   
-  const dispatch = useDispatch<AppDispatch>();
-  const { loading, error } = useSelector((state: RootState) => ({
-    loading: false, // Placeholder
-    error: null, // Placeholder
-  }));
+  const error = null; // Placeholder
 
   // Sample data - would normally come from state
-  const [tables] = useState<Table[]>([
+  const [tables] = useState<TableInfo[]>([
     { id: '1', name: 'Table 1', capacity: 4, status: 'available', section_id: 'A' },
     { id: '2', name: 'Table 2', capacity: 4, status: 'occupied', section_id: 'A' },
     { id: '3', name: 'Table 3', capacity: 6, status: 'available', section_id: 'A' },
@@ -117,12 +112,12 @@ const POS: React.FC = () => {
     setActiveTab(newValue);
   };
 
-  const handleTableSelect = (table: Table) => {
+  const handleTableSelect = (table: TableInfo) => {
     setSelectedTable(table);
     // In a real app, this would fetch the existing order for the table
     setCurrentOrder(null);
     setOrderItems([]);
-    setOpenOrderDialog(true);
+    
   };
 
   const handleAddItem = () => {
@@ -176,7 +171,7 @@ const POS: React.FC = () => {
     setOpenPaymentDialog(false);
   };
 
-  const getStatusColor = (status: Table['status']) => {
+  const getStatusColor = (status: TableInfo['status']) => {
     switch (status) {
       case 'available': return '#4caf50'; // Green
       case 'occupied': return '#ff9800'; // Orange

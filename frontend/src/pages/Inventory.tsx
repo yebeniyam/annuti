@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Container,
   Typography,
@@ -24,8 +24,7 @@ import {
   InputLabel,
   Alert,
 } from '@mui/material';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '../store';
+
 
 // Define types for inventory
 interface InventoryItem {
@@ -40,14 +39,7 @@ interface InventoryItem {
   category_type: string;
 }
 
-interface InventoryTransaction {
-  id: string;
-  type: 'receiving' | 'issuing' | 'adjustment';
-  reference_id: string;
-  date: string;
-  notes: string;
-  user_id: string;
-}
+
 
 interface Unit {
   id: string;
@@ -59,7 +51,7 @@ const Inventory: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
-  const [currentItem, setCurrentItem] = useState<InventoryItem | null>(null);
+  
   
   // Form state
   const [name, setName] = useState('');
@@ -71,11 +63,7 @@ const Inventory: React.FC = () => {
   const [supplier, setSupplier] = useState('');
   const [categoryType, setCategoryType] = useState('');
   
-  const dispatch = useDispatch<AppDispatch>();
-  const { loading, error } = useSelector((state: RootState) => ({
-    loading: false, // Placeholder - would be from actual inventory state
-    error: null, // Placeholder - would be from actual inventory state
-  }));
+  const error = null; // Placeholder - would be from actual inventory state
 
   // Sample inventory items - these would normally come from state
   const [inventoryItems] = useState<InventoryItem[]>([
@@ -131,7 +119,6 @@ const Inventory: React.FC = () => {
     setDialogMode(mode);
     
     if (mode === 'edit' && item) {
-      setCurrentItem(item);
       setName(item.name);
       setCategory(item.category);
       setCurrentStock(item.current_stock.toString());
@@ -142,7 +129,6 @@ const Inventory: React.FC = () => {
       setCategoryType(item.category_type);
     } else {
       // Reset form for adding new item
-      setCurrentItem(null);
       setName('');
       setCategory('');
       setCurrentStock('');
