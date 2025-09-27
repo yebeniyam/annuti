@@ -118,12 +118,20 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+def check_if_first_user() -> bool:
+    """Check if this is the first user in the database."""
+    try:
+        result = supabase.client.table('users').select('*').limit(1).execute()
+        return not bool(result.data and len(result.data) > 0)
+    except Exception as e:
+        logger.error(f"Error checking for first user: {e}")
+        return False
+
 @router.post(
     "/register", 
     response_model=User, 
     status_code=status.HTTP_201_CREATED, 
-    summary="Register a new user",
-    dependencies=[Depends(get_admin_user)]  # Only admins can register new users
+    summary="Register a new user"
 )
 async def register(user: UserCreate):
     """
@@ -132,6 +140,8 @@ async def register(user: UserCreate):
     - **email**: Must be a valid email address
     - **password**: At least 8 characters
     - **full_name**: Optional full name
+    
+    The first user to register will be created as an admin. Subsequent users will be created as regular users.
     
     Returns:
         - The newly created user object (without password hash)
@@ -147,6 +157,9 @@ async def register(user: UserCreate):
                 detail="Email already registered"
             )
         
+        # Check if this is the first user (should be an admin)
+        is_first_user = check_if_first_user()
+        
         # Hash the password
         hashed_password = get_password_hash(user.password)
         
@@ -154,9 +167,10 @@ async def register(user: UserCreate):
         user_data = user.dict(exclude={"password"})
         user_data["hashed_password"] = hashed_password
         user_data["is_active"] = True
-        user_data["is_superuser"] = False
-        user_data["created_at"] = datetime.utcnow()
-        user_data["updated_at"] = datetime.utcnow()
+        user_data["is_superuser"] = is_first_user  # First user is superuser
+        user_data["role"] = "admin" if is_first_user else "staff"  # First user is admin
+        user_data["created_at"] = datetime.utcnow().isoformat()
+        user_data["updated_at"] = datetime.utcnow().isoformat()
         
         logger.debug(f"Creating user with data: {user_data}")
         
@@ -192,10 +206,7 @@ async def register(user: UserCreate):
         logger.warning(f"Registration failed for {user.email}: {http_exc.detail}")
         raise http_exc
         
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"Error registering user: {e}")
         logger.error(f"Unexpected error during registration for {user.email}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

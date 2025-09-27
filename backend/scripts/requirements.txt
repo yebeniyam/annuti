@@ -1,0 +1,8 @@
+python-dotenv
+supabase
+fastapi
+pydantic[email]
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+python-dateutil
