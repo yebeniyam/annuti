@@ -43,7 +43,10 @@ class TableUpdate(BaseModel):
 class Table(TableBase):
     id: str
     created_at: datetime
-{{ ... }}
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 class OrderItemBase(BaseModel):
     menu_item_id: str
     quantity: int = Field(..., gt=0)
@@ -64,7 +67,11 @@ class OrderItem(OrderItemBase):
     id: str
     order_id: str
     created_at: datetime
-{{ ... }}
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class PaymentBase(BaseModel):
     order_id: str
     amount: float = Field(..., gt=0)
@@ -83,6 +90,7 @@ class PaymentUpdate(BaseModel):
 class Payment(PaymentBase):
     id: str
     created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
