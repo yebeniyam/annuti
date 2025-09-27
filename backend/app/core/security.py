@@ -3,6 +3,19 @@ import sys
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Union
 
+__all__ = [
+    'oauth2_scheme',
+    'verify_password',
+    'get_password_hash',
+    'create_access_token',
+    'get_current_user',
+    'get_current_active_user',
+    'get_admin_user',
+    'get_manager_user',
+    'get_staff_user',
+    'ACCESS_TOKEN_EXPIRE_MINUTES'
+]
+
 # Configure logging first
 logging.basicConfig(
     level=logging.INFO,
@@ -171,3 +184,40 @@ async def get_current_user(
 
 # Dependency for getting the current active user
 get_current_active_user = get_current_user
+
+# Role-based dependencies
+def get_admin_user(current_user: UserInDB = Depends(get_current_user)) -> UserInDB:
+    """
+    Dependency to get the current admin user.
+    Raises HTTP 403 if the user is not an admin.
+    """
+    if UserRole.ADMIN not in current_user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions. Admin access required."
+        )
+    return current_user
+
+def get_manager_user(current_user: UserInDB = Depends(get_current_user)) -> UserInDB:
+    """
+    Dependency to get the current manager user.
+    Raises HTTP 403 if the user is not at least a manager.
+    """
+    if not any(role in current_user.roles for role in [UserRole.ADMIN, UserRole.MANAGER]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions. Manager or higher access required."
+        )
+    return current_user
+
+def get_staff_user(current_user: UserInDB = Depends(get_current_user)) -> UserInDB:
+    """
+    Dependency to get the current staff user.
+    Raises HTTP 403 if the user is not at least a staff member.
+    """
+    if not any(role in current_user.roles for role in [UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions. Staff or higher access required."
+        )
+    return current_user
