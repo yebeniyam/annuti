@@ -8,6 +8,7 @@ import {
   Paper,
   Alert,
   CircularProgress,
+  Link,
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
@@ -19,7 +20,9 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { loading, error } = useSelector((state: RootState) => state.auth);
+  const registrationSuccess = location.state?.registrationSuccess;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +77,12 @@ const LoginPage: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
             />
             
-            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+            {registrationSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Registration successful! Please log in.
+              </Alert>
+            )}
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             
             <Button
               type="submit"
@@ -87,13 +95,22 @@ const LoginPage: React.FC = () => {
             </Button>
           </form>
           
-          <Typography variant="body2" align="center" sx={{ mt: 2 }}>
-            <RouterLink to="/">Back to Home</RouterLink>
-          </Typography>
+          <Box sx={{ textAlign: 'center', mt: 2 }}>
+            <Typography variant="body2">
+              Don't have an account?{' '}
+              <Link component={RouterLink} to="/register" variant="body2">
+                Sign up
+              </Link>
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              <Link component={RouterLink} to="/" variant="body2">
+                Back to Home
+              </Link>
+            </Typography>
+          </Box>
         </Paper>
       </Box>
     </Container>
   );
 };
-
 export default LoginPage;

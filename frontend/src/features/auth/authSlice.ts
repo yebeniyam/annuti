@@ -2,6 +2,13 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { User } from '../../types/user';
 
+// Define interface for registration
+export interface RegistrationData {
+  email: string;
+  password: string;
+  full_name: string;
+}
+
 interface AuthState {
   user: User | null;
   token: string | null;
@@ -28,10 +35,10 @@ export const login = createAsyncThunk(
     try {
       const response = await axios.post<LoginResponse>(
         `${process.env.REACT_APP_API_URL}/api/v1/auth/login`,
-        {
+        new URLSearchParams({
           username,
           password,
-        },
+        }),
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -49,6 +56,30 @@ export const login = createAsyncThunk(
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.detail || 'Login failed'
+      );
+    }
+  }
+);
+
+// Async thunk for registration
+export const register = createAsyncThunk(
+  'auth/register',
+  async (userData: RegistrationData, { rejectWithValue }) => {
+    try {
+      const response = await axios.post<User>(
+        `${process.env.REACT_APP_API_URL}/api/v1/auth/register`,
+        userData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.detail || 'Registration failed'
       );
     }
   }

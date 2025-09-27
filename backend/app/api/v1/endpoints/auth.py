@@ -31,15 +31,45 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login
 
 router = APIRouter()
 
-def get_user_by_email(email: str) -> Optional[UserInDB]:
-    """Get a user by email from Supabase."""
+async def get_user_by_email(email: str) -> Optional[UserInDB]:
+    """Get a user by email from Supabase Auth."""
     try:
-        result = supabase.client.table('users').select('*').eq('email', email).single().execute()
-        if result.data:
-            return UserInDB(**result.data)
-        return None
+        # Try to get user from auth.users
+        auth_response = supabase.auth.admin.get_user_by_email(email)
+        
+        if not auth_response or not hasattr(auth_response, 'user') or not auth_response.user:
+            logger.warning(f"No user found with email: {email}")
+            return None
+            
+        auth_user = auth_response.user
+        
+        # Get additional user data from public.users if it exists
+        try:
+            result = supabase.client.table('users')\
+                .select('*')\
+                .eq('id', auth_user.id)\
+                .single()\
+                .execute()
+            user_data = result.data or {}
+        except Exception as db_error:
+            logger.warning(f"Could not fetch user data from public.users: {db_error}")
+            user_data = {}
+        
+        # Map auth user to our UserInDB model
+        return UserInDB(
+            id=auth_user.id,
+            email=auth_user.email,
+            hashed_password=auth_user.encrypted_password,
+            full_name=user_data.get('full_name'),
+            is_active=auth_user.confirmed_at is not None,
+            is_superuser=user_data.get('is_superuser', False),
+            role=user_data.get('role', 'user'),
+            created_at=auth_user.created_at,
+            updated_at=auth_user.updated_at or auth_user.created_at
+        )
+        
     except Exception as e:
-        print(f"Error getting user by email: {e}")
+        logger.error(f"Error in get_user_by_email for {email}: {str(e)}", exc_info=True)
         return None
 
 @router.post("/login", response_model=Token, summary="OAuth2 compatible token login")
@@ -60,29 +90,44 @@ async def login(
     try:
         logger.info(f"Login attempt for user: {form_data.username}")
         
-        # Get user from database
-        user = get_user_by_email(form_data.username)
+        # Authenticate with Supabase
+        try:
+            auth_response = supabase.auth.sign_in_with_password({
+                "email": form_data.username,
+                "password": form_data.password
+            })
+            
+            if not auth_response.user:
+                logger.warning(f"Authentication failed for {form_data.username}: Invalid credentials")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect email or password",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+                
+            user = auth_response.user
+            
+        except Exception as auth_error:
+            logger.warning(f"Authentication failed for {form_data.username}: {str(auth_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         
-        if not user:
-            logger.warning(f"Login failed - user not found: {form_data.username}")
+        # Get user details from database
+        db_user = await get_user_by_email(user.email)
+        if not db_user:
+            logger.warning(f"User not found in database: {user.email}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
             
-        # Verify password
-        if not verify_password(form_data.password, user.hashed_password):
-            logger.warning(f"Login failed - invalid password for user: {form_data.username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
         # Check if user is active
-        if not user.is_active:
-            logger.warning(f"Login failed - inactive user: {form_data.username}")
+        if not db_user.is_active:
+            logger.warning(f"Login failed - inactive user: {user.email}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Inactive user"
@@ -90,42 +135,48 @@ async def login(
         
         # Determine user's scopes based on role
         scopes = ["authenticated"]
-        if user.role == "admin":
+        if db_user.role == "admin":
             scopes.extend(["admin", "manager", "staff"])
-        elif user.role == "manager":
+        elif db_user.role == "manager":
             scopes.extend(["manager", "staff"])
-        elif user.role == "staff":
+        elif db_user.role == "staff":
             scopes.append("staff")
         
         # Create JWT token with appropriate scopes
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-            data={"sub": user.email},
+            data={"sub": db_user.email},
             scopes=scopes,
             expires_delta=access_token_expires
         )
         
-        logger.info(f"Login successful for user: {form_data.username}")
+        logger.info(f"Login successful for user: {user.email}")
         return {"access_token": access_token, "token_type": "bearer"}
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error during login for user {form_data.username}: {e}", exc_info=True)
+        logger.error(f"Unexpected error during login: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during login",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="An error occurred during login"
         )
 
-def check_if_first_user() -> bool:
-    """Check if this is the first user in the database."""
+async def check_if_first_user() -> bool:
+    """Check if there are any users in the database."""
     try:
-        result = supabase.client.table('users').select('*').limit(1).execute()
-        return not bool(result.data and len(result.data) > 0)
+        # Check auth.users
+        auth_users = supabase.auth.admin.list_users()
+        if auth_users.users and len(auth_users.users) > 1:  # >1 because we might be in the middle of registration
+            return False
+            
+        # Also check public.users for consistency
+        result = supabase.client.table('users').select('id', count='exact').execute()
+        return result.count == 0
+        
     except Exception as e:
-        logger.error(f"Error checking for first user: {e}")
-        return False
+        logger.error(f"Error checking for first user: {str(e)}")
+        return False  # Default to False to be safe
 
 @router.post(
     "/register", 
@@ -150,53 +201,80 @@ async def register(user: UserCreate):
         logger.info(f"Registration attempt for email: {user.email}")
         
         # Check if user already exists
-        existing_user = get_user_by_email(user.email)
-        if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
+        try:
+            existing_user = await get_user_by_email(user.email)
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered"
+                )
+        except Exception as e:
+            logger.error(f"Error checking for existing user: {e}")
+            raise
         
         # Check if this is the first user (should be an admin)
-        is_first_user = check_if_first_user()
+        is_first_user = await check_if_first_user()
         
-        # Hash the password
-        hashed_password = get_password_hash(user.password)
-        
-        # Create user data for database
-        user_data = user.dict(exclude={"password"})
-        user_data["hashed_password"] = hashed_password
-        user_data["is_active"] = True
-        user_data["is_superuser"] = is_first_user  # First user is superuser
-        user_data["role"] = "admin" if is_first_user else "staff"  # First user is admin
-        user_data["created_at"] = datetime.utcnow().isoformat()
-        user_data["updated_at"] = datetime.utcnow().isoformat()
-        
-        logger.debug(f"Creating user with data: {user_data}")
-        
-        # Insert user into database
         try:
-            result = supabase.client.table('users').insert(user_data).execute()
+            # Create user in Supabase Auth
+            auth_response = supabase.auth.sign_up({
+                "email": user.email,
+                "password": user.password,
+                "options": {
+                    "data": {
+                        "full_name": user.full_name,
+                        "is_superuser": is_first_user,
+                        "role": "admin" if is_first_user else "staff"
+                    }
+                }
+            })
             
-            # Check if the insert was successful
-            if not result.data or len(result.data) == 0:
-                logger.error(f"Failed to create user: No data returned from database")
+            if not auth_response.user:
+                logger.error("Failed to create user in Supabase Auth")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to create user: No data returned from database"
+                    detail="Failed to create user in authentication service"
                 )
                 
-            # Get the created user
-            created_user = result.data[0]
+            # Create user in public.users table
+            user_data = {
+                "id": auth_response.user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "is_active": True,
+                "is_superuser": is_first_user,
+                "role": "admin" if is_first_user else "staff",
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
             
-            # Remove sensitive data before returning
+            # Insert into public.users
+            result = supabase.client.table('users').insert(user_data).execute()
+            
+            if not result.data or len(result.data) == 0:
+                logger.error("Failed to create user in database")
+                # Try to clean up auth user if database insert fails
+                try:
+                    supabase.auth.admin.delete_user(auth_response.user.id)
+                except Exception as cleanup_error:
+                    logger.error(f"Failed to clean up auth user: {cleanup_error}")
+                
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to create user in database"
+                )
+            
+            # Return the created user (without sensitive data)
+            created_user = result.data[0]
             created_user.pop("hashed_password", None)
             
             logger.info(f"User registered successfully: {user.email}")
             return created_user
             
+        except HTTPException:
+            raise
         except Exception as db_error:
-            logger.error(f"Database error during user registration: {db_error}", exc_info=True)
+            logger.error(f"Error during user registration: {str(db_error)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="An error occurred while creating the user"
