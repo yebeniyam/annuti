@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(default="your-secret-key-here", env="SECRET_KEY")
     ALGORITHM: str = Field(default="HS256", env="ALGORITHM")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=1440, env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    API_V1_STR: str = Field(default="/api/v1", description="API version 1 prefix")
     
     # Database
     DATABASE_URL: str = Field(default="", env="DATABASE_URL")
@@ -26,20 +27,8 @@ class Settings(BaseSettings):
     
     # CORS
     CORS_ORIGINS: List[str] = Field(
-        default=os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(","),
-        description="Comma-separated list of allowed CORS origins"
-    )
-    ALLOW_CREDENTIALS: bool = Field(
-        default=os.getenv("ALLOW_CREDENTIALS", "true").lower() == "true",
-        description="Whether to allow credentials in CORS requests"
-    )
-    ALLOWED_METHODS: List[str] = Field(
-        default=os.getenv("ALLOWED_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(","),
-        description="List of allowed HTTP methods"
-    )
-    ALLOWED_HEADERS: List[str] = Field(
-        default=os.getenv("ALLOWED_HEADERS", "*,Authorization,Content-Type").split(","),
-        description="List of allowed HTTP headers"
+        default=["http://localhost:3000", "http://localhost:8000"],
+        description="List of allowed CORS origins"
     )
     
     # Pydantic v2 config
