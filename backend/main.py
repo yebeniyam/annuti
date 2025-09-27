@@ -104,13 +104,22 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 # Include API router
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Debug endpoint to check environment variables
+@app.get("/debug/env")
+async def debug_env():
+    return {
+        "supabase_url_set": bool(settings.SUPABASE_URL),
+        "supabase_key_set": bool(settings.SUPABASE_KEY),
+        "app_env": settings.APP_ENV
+    }
 
 # Root endpoint
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to Bendine API",
+        "name": "Annuti API",
         "version": "0.1.0",
         "environment": settings.APP_ENV,
         "docs": "/docs",
