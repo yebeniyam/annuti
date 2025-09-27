@@ -27,7 +27,11 @@ class Settings(BaseSettings):
     
     # CORS
     CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
+        default=[
+            "http://localhost:3000", 
+            "http://localhost:8000",
+            "https://annuti.vercel.app"
+        ],
         description="List of allowed CORS origins"
     )
     

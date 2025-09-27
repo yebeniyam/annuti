@@ -67,16 +67,25 @@ app = FastAPI(
 )
 
 # Configure CORS
-cors_origins = ["*"]  # In production, replace with specific origins
-if settings.CORS_ORIGINS:
-    cors_origins = settings.CORS_ORIGINS
+cors_origins = settings.CORS_ORIGINS
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=r"^https://annuti-.*\.vercel\.app$",  # Allow all subdomains of vercel.app
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+        "Access-Control-Allow-Headers",
+        "Access-Control-Allow-Origin"
+    ],
+    expose_headers=["Content-Disposition"],
+    max_age=600,  # Cache preflight requests for 10 minutes
 )
 
 # Exception handlers
