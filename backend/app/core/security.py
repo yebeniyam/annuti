@@ -1,17 +1,33 @@
+import logging
+import sys
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Union
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status, Security
-from fastapi.security import OAuth2PasswordBearer, SecurityScopes
-from pydantic import ValidationError, BaseModel
 
-from app.core.config import settings
-from app.models.user import UserInDB, TokenData, UserRole
-from app.models.user import User, UserInDB
-
-# Configure logging
+# Configure logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
 logger = logging.getLogger(__name__)
+
+try:
+    # Import required modules after logging is configured
+    from jose import JWTError, jwt
+    from passlib.context import CryptContext
+    from fastapi import Depends, HTTPException, status, Security
+    from fastapi.security import OAuth2PasswordBearer, SecurityScopes
+    from pydantic import ValidationError, BaseModel
+    
+    # Import app-specific modules
+    from app.core.config import settings
+    from app.models.user import UserInDB, TokenData, UserRole, User
+    
+    logger.info("Successfully imported all dependencies in security.py")
+    
+except ImportError as e:
+    logger.error(f"Error importing dependencies in security.py: {e}")
+    raise
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

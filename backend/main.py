@@ -1,30 +1,40 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, HTTPBearer
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-import uvicorn
-import logging
-from contextlib import asynccontextmanager
 import os
-from dotenv import load_dotenv
+import sys
+import logging
+from datetime import datetime
+from typing import List, Optional, Dict, Any
+from contextlib import asynccontextmanager
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Import after environment variables are loaded
-from app.core.config import settings
-from app.api.v1.api import api_router
-from app.core.security import security
-
-# Configure logging
+# Configure logging first
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
 )
 logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
+# Import FastAPI and other dependencies after logging is configured
+try:
+    from fastapi import FastAPI, Depends, HTTPException, status, Request
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.security import OAuth2PasswordBearer, HTTPBearer
+    from fastapi.responses import JSONResponse
+    from fastapi.exceptions import RequestValidationError
+    
+    # Import application components
+    from app.core.config import settings
+    from app.api.v1.api import api_router
+    from app.core import security
+    
+    logger.info("Successfully imported all dependencies in main.py")
+    
+except ImportError as e:
+    logger.error(f"Error importing application components in main.py: {e}")
+    raise
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -57,13 +67,16 @@ app = FastAPI(
 )
 
 # Configure CORS
+cors_origins = ["*"]  # In production, replace with specific origins
+if settings.CORS_ORIGINS:
+    cors_origins = settings.CORS_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=settings.ALLOW_CREDENTIALS,
-    allow_methods=settings.ALLOWED_METHODS,
-    allow_headers=settings.ALLOWED_HEADERS,
-    expose_headers=["Content-Disposition"],  # For file downloads
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Exception handlers
