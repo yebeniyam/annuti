@@ -11,16 +11,30 @@ import {
   Link,
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { login } from '../features/auth/authSlice';
 import { RootState, AppDispatch } from '../store';
+
+// Define the type for location state
+interface LocationState {
+  state?: {
+    registrationSuccess?: boolean;
+  };
+}
+
+// Define the type for location state
+interface LocationState {
+  state?: {
+    registrationSuccess?: boolean;
+  };
+}
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocation() as unknown as LocationState;
   const { loading, error } = useSelector((state: RootState) => state.auth);
   const registrationSuccess = location.state?.registrationSuccess;
 
