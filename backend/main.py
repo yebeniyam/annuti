@@ -72,7 +72,7 @@ cors_origins = settings.CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"^https://annuti-.*\.vercel\.app$",  # Allow all subdomains of vercel.app
+    allow_origin_regex="https://bendine.vercel.app",  # Allow all subdomains of vercel.app
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
