@@ -41,7 +41,7 @@ const LoginPage: React.FC = () => {
           // Redirect to dashboard after successful login
           navigate('/dashboard', { replace: true });
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           console.error('Auto-login failed:', error);
         });
     }
@@ -52,7 +52,7 @@ const LoginPage: React.FC = () => {
     try {
       await dispatch(login({ username: email, password })).unwrap();
       navigate('/dashboard', { replace: true });
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Login failed:', err);
     }
   };
