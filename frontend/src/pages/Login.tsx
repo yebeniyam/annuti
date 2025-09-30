@@ -22,18 +22,12 @@ interface LocationState {
   };
 }
 
-// Define the type for location state
-interface LocationState {
-  state?: {
-    registrationSuccess?: boolean;
-  };
-}
-
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const location = useLocation() as { state?: { registrationSuccess?: boolean } };
   const { loading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
   const registrationSuccess = location.state?.registrationSuccess;
 
