@@ -44,9 +44,11 @@ async def lifespan(app: FastAPI):
     
     try:
         # Test database connection
-        from app.core.supabase import supabase
-        result = supabase.client.table('users').select('*').limit(1).execute()
-        logger.info("✅ Successfully connected to Supabase")
+        from app.core.supabase import supabase, test_connection
+        if test_connection():
+            logger.info("✅ Successfully connected to Supabase")
+        else:
+            raise Exception("Failed to connect to Supabase")
     except Exception as e:
         logger.error(f"❌ Failed to connect to Supabase: {e}")
         raise
