@@ -51,7 +51,8 @@ async def lifespan(app: FastAPI):
             
             # Ensure admin user exists
             admin_email = "admin@example.com"
-            admin_password = "admin123"
+            # Use a strong password that's within bcrypt's 72-byte limit
+            admin_password = "Admin@Secure123!"
             admin_name = "Admin"
             
             try:
