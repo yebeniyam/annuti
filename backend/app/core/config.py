@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     
     # Supabase
     SUPABASE_URL: str = Field(default="", env="SUPABASE_URL")
-    SUPABASE_KEY: str = Field(default="", env="SUPABASE_KEY")
+    SUPABASE_ANON_KEY: str = Field(default="", env="SUPABASE_ANON_KEY")
+    SUPABASE_SERVICE_KEY: str = Field(default="", env="SUPABASE_SERVICE_KEY")
     SUPABASE_JWT_SECRET: str = Field(default="", env="SUPABASE_JWT_SECRET")
     
     # CORS

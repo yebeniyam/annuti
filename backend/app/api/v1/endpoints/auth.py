@@ -75,7 +75,6 @@ async def get_user_by_email(email: str) -> Optional[UserInDB]:
 @router.post("/login", response_model=Token, summary="OAuth2 compatible token login")
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    scopes: SecurityScopes = SecurityScopes(["authenticated"])
 ):
     """
     OAuth2 compatible token login, get an access token for future requests.
@@ -88,17 +87,27 @@ async def login(
         - **token_type**: Type of token (always "bearer")
     """
     try:
-        logger.info(f"Login attempt for user: {form_data.username}")
+        email = form_data.username
+        password = form_data.password
         
-        # Authenticate with Supabase
+        logger.info(f"Login attempt for user: {email}")
+        
+        # Validate input
+        if not email or not password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email and password are required"
+            )
+        
         try:
+            # Authenticate with Supabase
             auth_response = supabase.auth.sign_in_with_password({
-                "email": form_data.username,
-                "password": form_data.password
+                "email": email,
+                "password": password
             })
             
             if not auth_response.user:
-                logger.warning(f"Authentication failed for {form_data.username}: Invalid credentials")
+                logger.warning(f"Authentication failed for {email}: Invalid credentials")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Incorrect email or password",
@@ -106,60 +115,89 @@ async def login(
                 )
                 
             user = auth_response.user
+            logger.info(f"Supabase authentication successful for: {user.email}")
+            
+            # Get user details from database
+            db_user = await get_user_by_email(user.email)
+            if not db_user:
+                # Create user in database if not exists
+                logger.info(f"User {user.email} not found in database, creating...")
+                db_user = UserInDB(
+                    id=user.id,
+                    email=user.email,
+                    hashed_password=get_password_hash(password),
+                    full_name=user.user_metadata.get('name', user.email.split('@')[0]),
+                    is_active=True,
+                    is_superuser=user.role == 'admin',
+                    role=user.role or 'user',
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                
+                # Add to database
+                user_data = db_user.dict(exclude={'hashed_password'})
+                supabase.table('users').insert(user_data).execute()
+            
+            # Check if user is active
+            if not db_user.is_active:
+                logger.warning(f"Login failed - inactive user: {user.email}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account is inactive"
+                )
+            
+            # Determine user's scopes based on role
+            scopes = ["authenticated"]
+            if db_user.role == "admin" or db_user.is_superuser:
+                scopes.extend(["admin", "manager", "staff"])
+            elif db_user.role == "manager":
+                scopes.extend(["manager", "staff"])
+            elif db_user.role == "staff":
+                scopes.append("staff")
+            
+            # Create JWT token with appropriate scopes
+            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                data={
+                    "sub": db_user.email,
+                    "scopes": scopes,
+                    "user_id": str(db_user.id),
+                    "role": db_user.role
+                },
+                expires_delta=access_token_expires
+            )
+            
+            logger.info(f"Login successful for user: {user.email}")
+            return {
+                "access_token": access_token, 
+                "token_type": "bearer",
+                "user": {
+                    "email": db_user.email,
+                    "full_name": db_user.full_name,
+                    "role": db_user.role,
+                    "is_superuser": db_user.is_superuser
+                }
+            }
+            
+        except HTTPException:
+            raise
             
         except Exception as auth_error:
-            logger.warning(f"Authentication failed for {form_data.username}: {str(auth_error)}")
+            logger.error(f"Authentication error for {email}: {str(auth_error)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
-        # Get user details from database
-        db_user = await get_user_by_email(user.email)
-        if not db_user:
-            logger.warning(f"User not found in database: {user.email}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-            
-        # Check if user is active
-        if not db_user.is_active:
-            logger.warning(f"Login failed - inactive user: {user.email}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Inactive user"
-            )
-        
-        # Determine user's scopes based on role
-        scopes = ["authenticated"]
-        if db_user.role == "admin":
-            scopes.extend(["admin", "manager", "staff"])
-        elif db_user.role == "manager":
-            scopes.extend(["manager", "staff"])
-        elif db_user.role == "staff":
-            scopes.append("staff")
-        
-        # Create JWT token with appropriate scopes
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data={"sub": db_user.email},
-            scopes=scopes,
-            expires_delta=access_token_expires
-        )
-        
-        logger.info(f"Login successful for user: {user.email}")
-        return {"access_token": access_token, "token_type": "bearer"}
         
     except HTTPException:
         raise
+        
     except Exception as e:
         logger.error(f"Unexpected error during login: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during login"
+            detail="An error occurred during login. Please try again later."
         )
 
 async def check_if_first_user() -> bool:
