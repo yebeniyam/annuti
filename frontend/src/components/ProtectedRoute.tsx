@@ -7,13 +7,15 @@ import { CircularProgress, Box } from '@mui/material';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  isAuthenticated: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, isAuthenticated: propIsAuthenticated }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isAuthenticated, loading, token } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated: stateIsAuthenticated, loading, token } = useSelector((state: RootState) => state.auth);
   const location = useLocation();
+  const isAuthenticated = propIsAuthenticated !== undefined ? propIsAuthenticated : stateIsAuthenticated;
 
   useEffect(() => {
     // If we have a token but not authenticated, try to fetch user profile

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { login, fetchUserProfile } from './features/auth/authSlice';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -79,7 +79,9 @@ const AppContent = () => {
           } />
           <Route path="/" element={
             <ProtectedRoute isAuthenticated={isAuthenticated}>
-              <Layout />
+              <Layout>
+                <Outlet />
+              </Layout>
             </ProtectedRoute>
           }>
             <Route index element={<Navigate to="/dashboard" replace />} />
