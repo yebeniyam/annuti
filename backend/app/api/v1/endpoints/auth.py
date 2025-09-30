@@ -217,17 +217,25 @@ async def register(user: UserCreate):
         
         try:
             # Create user in Supabase Auth
-            auth_response = supabase.auth.sign_up({
-                "email": user.email,
-                "password": user.password,
-                "options": {
-                    "data": {
-                        "full_name": user.full_name,
-                        "is_superuser": is_first_user,
-                        "role": "admin" if is_first_user else "staff"
+            try:
+                auth_response = supabase.auth.sign_up({
+                    "email": user.email,
+                    "password": user.password,
+                    "options": {
+                        "data": {
+                            "full_name": user.full_name,
+                            "is_superuser": is_first_user,
+                            "role": "admin" if is_first_user else "staff"
+                        }
                     }
-                }
-            })
+                })
+                logger.info(f"Supabase auth response: {auth_response}")
+            except Exception as auth_error:
+                logger.error(f"Error creating user in Supabase Auth: {str(auth_error)}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Authentication service error: {str(auth_error)}"
+                )
             
             if not auth_response.user:
                 logger.error("Failed to create user in Supabase Auth")
@@ -249,9 +257,12 @@ async def register(user: UserCreate):
             }
             
             # Insert into public.users
-            result = supabase.client.table('users').insert(user_data).execute()
-            
-            if not result.data or len(result.data) == 0:
+            try:
+                logger.info(f"Attempting to insert user data: {user_data}")
+                result = supabase.client.table('users').insert(user_data).execute()
+                logger.info(f"Database insert result: {result}")
+                
+                if not hasattr(result, 'data') or not result.data or len(result.data) == 0:
                 logger.error("Failed to create user in database")
                 # Try to clean up auth user if database insert fails
                 try:
@@ -274,10 +285,16 @@ async def register(user: UserCreate):
         except HTTPException:
             raise
         except Exception as db_error:
-            logger.error(f"Error during user registration: {str(db_error)}", exc_info=True)
+            error_detail = f"Database error: {str(db_error)}"
+            if hasattr(db_error, 'args') and db_error.args:
+                error_detail = f"{error_detail} - Args: {db_error.args}"
+            if hasattr(db_error, 'message'):
+                error_detail = f"{error_detail} - Message: {db_error.message}"
+                
+            logger.error(f"Error during user registration: {error_detail}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="An error occurred while creating the user"
+                detail=error_detail
             )
         
     except HTTPException as http_exc:
