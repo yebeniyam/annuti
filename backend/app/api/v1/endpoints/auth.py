@@ -263,17 +263,17 @@ async def register(user: UserCreate):
                 logger.info(f"Database insert result: {result}")
                 
                 if not hasattr(result, 'data') or not result.data or len(result.data) == 0:
-                logger.error("Failed to create user in database")
-                # Try to clean up auth user if database insert fails
-                try:
-                    supabase.auth.admin.delete_user(auth_response.user.id)
-                except Exception as cleanup_error:
-                    logger.error(f"Failed to clean up auth user: {cleanup_error}")
-                
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Failed to create user in database"
-                )
+                    logger.error("Failed to create user in database")
+                    # Try to clean up auth user if database insert fails
+                    try:
+                        supabase.auth.admin.delete_user(auth_response.user.id)
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to clean up auth user: {cleanup_error}")
+                    
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to create user in database"
+                    )
             
             # Return the created user (without sensitive data)
             created_user = result.data[0]
