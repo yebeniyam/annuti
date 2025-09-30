@@ -1,8 +1,12 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { useEffect } from 'react';
+import { login, fetchUserProfile } from './features/auth/authSlice';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { CircularProgress, Box } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
 import './App.css';
 
@@ -41,6 +45,43 @@ const theme = createTheme({
 });
 
 function App() {
+  const dispatch = useDispatch();
+  const { isAuthenticated, loading, token } = useSelector((state: { 
+    auth: { 
+      isAuthenticated: boolean; 
+      loading: boolean; 
+      token: string | null;
+    } 
+  }) => state.auth);
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if we have a token but user is not authenticated
+    if (token && !isAuthenticated && !loading) {
+      // Try to fetch user profile using the token
+      dispatch(fetchUserProfile() as any);
+    } else if (!token && !isAuthenticated && !loading && location.pathname !== '/login' && location.pathname !== '/register') {
+      // If no token and not on auth pages, try to auto-login with default admin credentials
+      dispatch(login({ username: 'admin@example.com', password: 'admin123' }) as any)
+        .unwrap()
+        .catch(() => {
+          // If auto-login fails, redirect to login page
+          if (location.pathname !== '/login' && location.pathname !== '/register') {
+            window.location.href = '/login';
+          }
+        });
+    }
+  }, [dispatch, isAuthenticated, loading, token, location.pathname]);
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Provider store={store}>
       <ThemeProvider theme={theme}>
@@ -48,16 +89,22 @@ function App() {
         <Router>
           <div className="App">
             <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LoginPage />} />
+              <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" /> : <RegisterPage />} />
               <Route
-                path="/"
+                path="/dashboard"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <Dashboard />
                     </Layout>
                   </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/"
+                element={
+                  <Navigate to="/dashboard" replace />
                 }
               />
               <Route

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Box,
@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { register, RegistrationData } from '../features/auth/authSlice';
+import { register, login, RegistrationData } from '../features/auth/authSlice';
 import { RootState, AppDispatch } from '../store';
 
 const RegisterPage: React.FC = () => {
@@ -26,7 +26,14 @@ const RegisterPage: React.FC = () => {
   
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const { loading, error } = useSelector((state: RootState) => state.auth);
+  const { loading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -79,13 +86,27 @@ const RegisterPage: React.FC = () => {
     }
     
     try {
+      // Register the user
       await dispatch(register(formData)).unwrap();
-      // Redirect to login page with success message
-      navigate('/login', { state: { registrationSuccess: true } });
+      
+      // Automatically log in the user after successful registration
+      await dispatch(login({ username: formData.email, password: formData.password })).unwrap();
+      
+      // Redirect to dashboard after successful login
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('Registration failed:', err);
     }
   };
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Container component="main" maxWidth="xs">

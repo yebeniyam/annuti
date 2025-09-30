@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Box,
@@ -34,19 +34,43 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const location = useLocation() as unknown as LocationState;
-  const { loading, error } = useSelector((state: RootState) => state.auth);
+  const { loading, error, isAuthenticated } = useSelector((state: RootState) => state.auth);
   const registrationSuccess = location.state?.registrationSuccess;
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    // Auto-login admin user if not authenticated and not already loading
+    if (!isAuthenticated && !loading) {
+      dispatch(login({ username: 'admin@example.com', password: 'admin123' }) as any)
+        .unwrap()
+        .then(() => {
+          // Redirect to dashboard after successful login
+          navigate('/dashboard', { replace: true });
+        })
+        .catch((error) => {
+          console.error('Auto-login failed:', error);
+        });
+    }
+  }, [dispatch, isAuthenticated, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await dispatch(login({ username: email, password })).unwrap();
-      navigate('/'); // Redirect to dashboard after login
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       console.error('Login failed:', err);
     }
   };
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Container component="main" maxWidth="xs">

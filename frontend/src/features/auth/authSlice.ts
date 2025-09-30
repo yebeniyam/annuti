@@ -28,17 +28,17 @@ interface LoginResponse {
   token_type: string;
 }
 
-// Async thunk for login
+// Login with credentials
 export const login = createAsyncThunk(
   'auth/login',
-  async ({ username, password }: LoginCredentials, { rejectWithValue }) => {
+  async (credentials: LoginCredentials, { rejectWithValue }) => {
     try {
       const response = await axios.post<LoginResponse>(
         `${process.env.REACT_APP_API_URL}/api/v1/auth/login`,
         new URLSearchParams({
-          username,
-          password,
-        }),
+          username: credentials.username,
+          password: credentials.password,
+        }).toString(),
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -47,78 +47,78 @@ export const login = createAsyncThunk(
       );
       
       // Store token in localStorage
-      localStorage.setItem('token', response.data.access_token);
+      const token = response.data.access_token;
+      localStorage.setItem('token', token);
+      
+      // Fetch user profile after successful login
+      const profileResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/v1/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       
       return {
-        token: response.data.access_token,
-        user: null, // We'll fetch user details separately
+        user: profileResponse.data,
+        token,
       };
-    } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.detail || 'Login failed'
-      );
-    }
-  }
-);
-
-// Async thunk for registration
-export const register = createAsyncThunk(
-  'auth/register',
-  async (userData: RegistrationData, { rejectWithValue }) => {
-    try {
-      const response = await axios.post<User>(
-        `${process.env.REACT_APP_API_URL}/api/v1/auth/register`,
-        userData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
       
-      return response.data;
     } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.detail || 'Registration failed'
-      );
+      console.error('Login failed:', error);
+      return rejectWithValue(error.response?.data?.detail || 'Login failed');
     }
   }
 );
 
-// Async thunk for fetching user profile
+// Fetch user profile
 export const fetchUserProfile = createAsyncThunk(
   'auth/fetchUserProfile',
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        throw new Error('No token found');
+        throw new Error('No authentication token found');
       }
       
-      const response = await axios.get<User>(
-        `${process.env.REACT_APP_API_URL}/api/v1/auth/me`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/v1/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(
-        error.response?.data?.detail || 'Failed to fetch user profile'
-      );
+      // If there's an error, clear the invalid token
+      localStorage.removeItem('token');
+      return rejectWithValue(error.response?.data?.detail || 'Failed to fetch user profile');
     }
   }
 );
 
-// Async thunk for logout
+// Logout
 export const logout = createAsyncThunk(
   'auth/logout',
-  async () => {
-    // Remove token from localStorage
-    localStorage.removeItem('token');
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Call the logout API if needed
+        await axios.post(
+          `${process.env.REACT_APP_API_URL}/api/v1/auth/logout`,
+          {},
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error during logout:', error);
+    } finally {
+      // Always remove the token from localStorage
+      localStorage.removeItem('token');
+      return true;
+    }
   }
 );
 
@@ -134,49 +134,64 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    clearError: (state) => {
+    clearError: (state: AuthState) => {
       state.error = null;
     },
   },
   extraReducers: (builder) => {
     builder
       // Login cases
-      .addCase(login.pending, (state) => {
+      .addCase(login.pending, (state: AuthState) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(login.fulfilled, (state, action) => {
+      .addCase(login.fulfilled, (state: AuthState, action) => {
         state.loading = false;
+        state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
         state.error = null;
       })
-      .addCase(login.rejected, (state, action) => {
+      .addCase(login.rejected, (state: AuthState, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload as string || 'Failed to login';
         state.token = null;
         state.isAuthenticated = false;
+        localStorage.removeItem('token');
       })
       // Fetch user profile cases
-      .addCase(fetchUserProfile.fulfilled, (state, action) => {
+      .addCase(fetchUserProfile.pending, (state: AuthState) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchUserProfile.fulfilled, (state: AuthState, action) => {
         state.user = action.payload;
         state.isAuthenticated = true;
         state.loading = false;
+        state.error = null;
       })
-      .addCase(fetchUserProfile.rejected, (state, action) => {
+      .addCase(fetchUserProfile.rejected, (state: AuthState, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload as string || 'Failed to fetch user profile';
         state.user = null;
         state.isAuthenticated = false;
         state.token = null;
-        // Remove invalid token from localStorage
         localStorage.removeItem('token');
       })
       // Logout case
-      .addCase(logout.fulfilled, (state) => {
+      .addCase(logout.pending, (state: AuthState) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(logout.fulfilled, (state: AuthState) => {
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
+        state.loading = false;
+      })
+      .addCase(logout.rejected, (state: AuthState, action) => {
+        state.loading = false;
+        state.error = action.payload as string || 'Failed to logout';
       });
   },
 });

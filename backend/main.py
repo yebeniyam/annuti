@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from contextlib import asynccontextmanager
+from app.core.security import get_password_hash, verify_password
 
 # Configure logging first
 logging.basicConfig(
@@ -47,6 +48,94 @@ async def lifespan(app: FastAPI):
         from app.core.supabase import supabase, test_connection
         if test_connection():
             logger.info("✅ Successfully connected to Supabase")
+            
+            # Ensure admin user exists
+            admin_email = "admin@example.com"
+            admin_password = "admin123"
+            admin_name = "Admin"
+            
+            try:
+                # Check if admin user exists
+                result = supabase.from_('users').select('*').eq('email', admin_email).execute()
+                
+                if not result.data:
+                    # Create admin user if not exists
+                    hashed_password = get_password_hash(admin_password)
+                    
+                    # Create auth user
+                    auth_response = supabase.auth.admin.create_user({
+                        "email": admin_email,
+                        "password": admin_password,
+                        "email_confirm": True,
+                        "user_metadata": {
+                            "name": admin_name
+                        }
+                    })
+                    
+                    if not auth_response.user:
+                        raise Exception("Failed to create auth user")
+                    
+                    # Create user in public.users
+                    user_data = {
+                        "id": str(auth_response.user.id),
+                        "email": admin_email,
+                        "full_name": admin_name,
+                        "hashed_password": hashed_password,
+                        "is_active": True,
+                        "is_superuser": True,
+                        "role": "admin"
+                    }
+                    
+                    result = supabase.from_('users').insert(user_data).execute()
+                    if hasattr(result, 'error') and result.error:
+                        raise Exception(f"Failed to create admin user: {result.error}")
+                    
+                    logger.info("✅ Admin user created successfully")
+                else:
+                    # Update admin user password and details to ensure they're set correctly
+                    try:
+                        admin_user = result.data[0]
+                        user_id = admin_user['id']
+                        
+                        # Update auth user password and details
+                        supabase.auth.admin.update_user_by_id(
+                            str(user_id),
+                            {
+                                "password": admin_password,
+                                "email": admin_email,
+                                "user_metadata": {"name": admin_name}
+                            }
+                        )
+                        
+                        # Update user in public.users
+                        update_data = {
+                            "email": admin_email,
+                            "full_name": admin_name,
+                            "is_active": True,
+                            "is_superuser": True,
+                            "role": "admin"
+                        }
+                        
+                        # Only update hashed password if it's different or missing
+                        hashed_password = admin_user.get('hashed_password')
+                        if not hashed_password or not verify_password(admin_password, hashed_password):
+                            update_data["hashed_password"] = get_password_hash(admin_password)
+                        
+                        update_result = supabase.from_('users').update(update_data).eq('id', user_id).execute()
+                        
+                        if hasattr(update_result, 'error') and update_result.error:
+                            logger.warning(f"⚠️ Failed to update admin user details: {update_result.error}")
+                        else:
+                            logger.info("✅ Admin user details updated successfully")
+                            
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to update admin user: {e}")
+                    
+                    logger.info("✅ Admin user already exists")
+                    
+            except Exception as e:
+                logger.error(f"❌ Failed to ensure admin user exists: {e}")
+                
         else:
             raise Exception("Failed to connect to Supabase")
     except Exception as e:
