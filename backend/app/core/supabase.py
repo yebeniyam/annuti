@@ -14,6 +14,8 @@ class SupabaseClient:
         
         try:
             self.client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+            # Add auth as a direct attribute for backward compatibility
+            self.auth = self.client.auth
             logger.info("Successfully initialized Supabase client")
         except Exception as e:
             logger.error(f"Failed to initialize Supabase client: {e}")

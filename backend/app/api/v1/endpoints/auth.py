@@ -20,7 +20,10 @@ from app.core.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     oauth2_scheme
 )
-from app.core.supabase import supabase, SupabaseClient
+from app.core.supabase import SupabaseClient
+
+# Get the Supabase client instance
+supabase = SupabaseClient.get_instance().client
 from app.models.user import User, UserInDB, UserCreate, UserUpdate, Token, TokenData
 
 # Configure logging
