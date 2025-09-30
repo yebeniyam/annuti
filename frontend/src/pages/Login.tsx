@@ -33,19 +33,10 @@ const LoginPage: React.FC = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    // Auto-login admin user if not authenticated and not already loading
-    if (!isAuthenticated && !loading) {
-      dispatch(login({ username: 'admin@example.com', password: 'admin123' }) as any)
-        .unwrap()
-        .then(() => {
-          // Redirect to dashboard after successful login
-          navigate('/dashboard', { replace: true });
-        })
-        .catch((error: unknown) => {
-          console.error('Auto-login failed:', error);
-        });
+    if (isAuthenticated) {
+      navigate('/dashboard', { replace: true });
     }
-  }, [dispatch, isAuthenticated, loading, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
